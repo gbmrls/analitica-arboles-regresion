@@ -47,6 +47,9 @@ Procedemos para empezar en instalar los siguientes paquetes, se puede omitir est
 ```{r}
 #install.packages("DataExplorer")
 #install.packages("lares")
+#install.packages("ggplot2")
+#install.packages("ggthemes")
+#install.packages("vtree")
 ```
 ## Cargar Librerías
  
@@ -55,6 +58,9 @@ Usando 'library' cargamos las librerías, con las cuales vas a hacer uso de las 
 ```{r}
 library("DataExplorer")
 library("lares")
+library("ggplot2")
+library("ggthemes")
+library("vtree")
 ```
 
 ## Ánalisis Descriptivo, Data Engineering
@@ -184,8 +190,64 @@ plot_qq(log_qq_data, sampled_rows = 1000L)
 ```
 
 ### Ánalisis Exploratorio de los Datos
-Teniendo nuestras variables con mayor correlación vamos a gráficarlas con geom point, se puede observar fácilmente que a mayor diametro de rotor , mayor es la capacidad rated de la turbina:
+Teniendo nuestras variables con mayor correlación vamos a gráficarlas con geom point..:
 
-- Creciente para rotor diamater_m y turbine_rated_capacity_k_w
+- min_playtime-max_playtime
+
+
+```{r}
+final_board_games %>%  ggplot(aes(x = min_playtime, y = max_playtime)) + 
+  geom_point()
+```
+
+- average_rating-min_age
+
+
+```{r}
+final_board_games %>%  ggplot(aes(x = average_rating, y = min_age)) + 
+  geom_point()
+```
+
+- average_rating-playing_time
+
+
+```{r}
+final_board_games %>%  ggplot(aes(x = playing_time, y = average_rating)) + 
+  geom_point()
+```
+
+- users_rated-average_rating
+
+
+```{r}
+final_board_games %>%  ggplot(aes(x = users_rated, y = average_rating)) + 
+  geom_point()
+```
+
+
+###Using vtree para explorar
+
+Usamos vtree para observar la concentración de los datos por ejemplo para min_age, donde la mayoría de los datos se concentran en min_age de 8 años, 10 años y 12 años.
+
+```{r}
+vtree(final_board_games, "min_age")
+```
+
+Usamos vtree para observar la concentración de los datos por ejemplo para min_players, tenemos casi un 69% para min 2 jugadores y cerca del 19% para min 3 jugadores.
+
+```{r}
+vtree(final_board_games, "min_players")
+```
+
+
+Usamos vtree para observar la concentración de los datos por ejemplo para max_players, tenemos casi un 23% para máx 4 jugadores y cerca del 25% para máx 6 jugadores.
+
+```{r}
+vtree(final_board_games, "max_players")
+```
+
+
+
+
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
