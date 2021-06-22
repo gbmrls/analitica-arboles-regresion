@@ -174,7 +174,7 @@ qq_data <- final_board_games[, c("min_playtime", "max_playtime", "min_age", "pla
 plot_qq(qq_data, sampled_rows = 1000L)
 
 ```
-En el gráfico, las columnas parecen sesgadas en ambas colas. Apliquemos una transformación logarítmica simple y grafiquemos de nuevo. Average Rating no mejoró
+En el gráfico, las columnas parecen sesgadas en ambas colas. Apliquemos una transformación logarítmica simple y grafiquemos de nuevo. Average Rating no mejoró. Gabo si ves que es necesario podemos hacerle update a las columnas con la transformación.
 ```{r}
 log_qq_data <- update_columns(qq_data, 1:5, function(x) log(x + 1))
 
@@ -183,6 +183,9 @@ plot_qq(log_qq_data, sampled_rows = 1000L)
 
 ```
 
+### Ánalisis Exploratorio de los Datos
+Teniendo nuestras variables con mayor correlación vamos a gráficarlas con geom point, se puede observar fácilmente que a mayor diametro de rotor , mayor es la capacidad rated de la turbina:
 
+- Creciente para rotor diamater_m y turbine_rated_capacity_k_w
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
