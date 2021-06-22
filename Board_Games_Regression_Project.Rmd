@@ -264,7 +264,7 @@ vtree(final_board_games, "max_players")
 
 ### Descartar los fabricantes que no aportan data
 
-Quitamos los fabricantes que no aportan data y nos quedamos con los que acumulan juntos el 85%, volvemos a gráficar, ahora si esto se ve más claro!!
+Quitamos los fabricantes que no aportan data, volvemos a gráficar, ahora si esto se ve más claro!!
 
 ```{r}
 final_board_games <- final_board_games %>% filter(min_players %in% c('0','4','8'))
@@ -273,6 +273,77 @@ final_board_games %>%  ggplot() +
   geom_bar(mapping = aes(x = min_players)) +
   ggtitle("Count of Board Games by min_players")
 ```
+
+Quitamos los fabricantes que no aportan data, volvemos a gráficar, ahora si esto se ve más claro!!
+
+```{r}
+final_board_games <- final_board_games %>% filter(max_players %in% c('0','9','12','13','15','18','24','99'))
+
+final_board_games %>%  ggplot() +
+  geom_bar(mapping = aes(x = max_players)) +
+  ggtitle("Count of Board Games by max_players")
+```
+
+### ¿Que se ha hecho hasta ahora?
+
+Se realizó una exploración de datos, donde primero eliminalos columnas que no tienen mucha significancia en la predicción de nuestra variable turbine rated capacity, después vimos su correlación entre las existentes, y seleccionamos esas tres para analizarlas, también quité notes una variable con muchos missing values, entonces entre otras cosas más se hicieron como por ejemplo: 
+
+- hub_height_m: Le aplicamos un log porque su data tiene ambas colas muy sesgadas, pero aún así no funcionó la transformación y quedó igual , así que no se modifició
+- rotor_diamater_m: Se revisó que tiene una correlación creciente , aunque tenía unos outliers con los fabricantes,
+- manufacturers: después de analizarlos con root_diamater, y con su capacity, observé que en realidad algunos datos se perdían entre la correlación por lo que hice fue primero hacer una limpieza a los fabricantes y solo dejé los 4 que daban más significado al data con casi un 85%
+
+Se tiene más claro cuales son las variables más significativas a la predicción, se hizo una limpieza, tenemos datos más contundentes con los cuales comenzar nuestra predicción, menos outliers sobre todo.
+
+
+
+
+## rpart library for decision tree
+ 
+### Leemos nuestro dataset
+
+```{r}
+set.seed(0)  # La semilla
+final_board_games_n <- final_board_games[c(4,5,6,7,8,10,19,20)]
+final_board_games_rpart <- as.data.frame(final_board_games_n)
+split = sample.split(final_board_games_rpart,SplitRatio=0.8) # Los datos de train serán de 80%
+train_rpart = subset(final_board_games_rpart,split == TRUE)
+test_rpart = subset(final_board_games_rpart,split == FALSE)
+```
+
+
+```{r}
+summary(train_rpart)
+summary(test_rpart)
+```
+
+### Leemos nuestro dataset
+
+En este caso usamos fread, de data table, proceedemos a leer:
+
+```{r}
+# Modelo de regresión con el conjunto de datos train
+# Modelo de regresión con el conjunto de datos train
+regtree <- rpart(formula=average_rating~., 
+                 data = train_rpart, 
+                 control = rpart.control(maxdepth =  3))
+
+# Visualización del árbol de decisión
+rpart.plot(regtree, box.palette = "RdBu", digits= -3)
+```
+
+```{r}
+# Cálculo del predictor
+test_rpart <- test_rpart %>%  mutate(pred =predict(regtree, test_rpart, type = "vector"),
+                         reg = 1:nrow(test_rpart),
+                         dif_pred_coll = hub_height_m-pred)
+
+ggplot(test_rpart)+
+  geom_point(aes(x=reg, y=dif_pred_coll))
+
+#[1] 23529.06
+MSE2 <- mean((test_rpart$pred - test_rpart$total_project_capacity_mw)^2)
+```
+
 
 
 
