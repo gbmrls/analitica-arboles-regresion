@@ -1,0 +1,188 @@
+---
+title: "Board_Games_Regression_Project"
+author: 'Adrian Homero Moreno García- adrian.moreno@iteso.mx, Gabriel Alejandro Morales
+  Ruiz- '
+date: "6/21/2021"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  github_document:
+    toc: yes
+    dev: jpeg
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    theme: cosmo
+    highlight: tango
+---
+
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(echo= TRUE,
+                      fig.height = 6, fig.width = 7)
+```
+
+<style>
+.forceBreak { -webkit-column-break-after: always; break-after: column; }
+</style>
+
+<center>
+![](./images/iteso.jpeg){width=20%}
+
+
+</center>
+
+## Introducción
+
+José es un diseñador de juegos de mesa. Crea las reglas, diseña los gráficos, escoge su tema, número de jugadores y duración promedio del juego que tiene en mente. José es una persona tímida, y a pesar de que sus juegos suelen gustarle a sus amigos, él nunca ha querido publicarlos por miedo a que no sean bien recibidos. Se quiere demostrar a José, con una base de datos de calificaciones históricas de juegos de mesa, cómo hubieran sido recibidos sus juegos en promedio en la época que los fue creando.
+
+Los datos a utilizar vienen de esta base de datos: 
+[(board_games)](https://github.com/rfordatascience/tidytuesday/tree/master/data/2019/2019-03-12)*
+que, en cambio, vienen de la página Board Game Geek.
+
+## Instalación de Paquetes
+
+Procedemos para empezar en instalar los siguientes paquetes, se puede omitir este paso si ya se tienen previamente instalados. Aquí una lista de los cuales vamos a necesitar.
+
+```{r}
+#install.packages("DataExplorer")
+#install.packages("lares")
+```
+## Cargar Librerías
+ 
+Usando 'library' cargamos las librerías, con las cuales vas a hacer uso de las diferentes funciones. 
+
+```{r}
+library("DataExplorer")
+library("lares")
+```
+
+## Ánalisis Descriptivo, Data Engineering
+ 
+### Leemos nuestro dataset
+
+En este caso usamos read.csv, proceedemos a leer:
+
+```{r}
+board_games <- read.csv("./board_games.csv") 
+```
+
+### Observación de las primeras líneas
+
+Para ejemplificar usaremos el data frame `turbines`, y con la función `head()` solo mostraremos las pirmeras 6 líneas de este: 
+
+- game_id	Identificador único
+- description	Descripción corta
+- image	URL con imagen del juego
+- max_players	Jugadores máximos
+- max_playtime	Tiempo máximo de juego
+- min_age	Edad mínima
+- min_players	Jugadores mínimos
+- min_playtime	Tiempo mínimo de juego
+- name	Nombre del juego
+- playing_time	Tiempo promedio de juego
+- thumbnail	URL con thumbnail del juego
+- year_published	Año de publicación
+- artist	Diseñador gráfico del juego
+- category	Categorías del juego (separadas por coma)
+- compilation	Si es parte de una compilación, nombre de la compilación
+- designer	Diseñador del juego
+- expansion	Si hay una expansión, el nombre de la expansión
+- family	Familia, equivalente a editora
+- mechanic	Mecánicas, separadas por coma
+- publisher	Compañía o persona que publicaron el juego (separadas por coma)
+- average_rating	Calificación promedio en Board Game Geek
+- users_rated	Número de usuarios que calificaron el juego
+
+```{r}
+head(board_games)
+```
+
+### Colnames de nuestro dataset
+
+Después de una rápida observación, ejecutamos los siguientes comandos para confirmación:
+
+```{r}
+colnames(board_games)
+```
+
+### Tipo de variables
+
+Usando data explorer observamos el tipo de variables, casi tenemos el mismo porcentaje para las discretas y continua, y tenemos un bajo porcentaje de missing values:
+
+- Sólo el 0.99% de las filas están completas,
+- tenemos 11.54% de observaciones faltantes, es decir, dado que solo tenemos 0.99% de las filas completas, solo hay 10.55% de observaciones faltantes del total.
+
+Estos valores faltantes nos podrán general problemas para analizar los datos, veamos un poco los perfiles que faltan.
+
+```{r barplot}
+plot_intro(board_games)
+```
+
+### Missing plot
+
+Para visualizar el perfil de los datos faltantes podemos utilizar la función plot_missing(). En la visualización debajo, podemos ver que la variables compilation y expansion, son las que les falta información, encontramos de que sólo el 2.63% (compilation), 16.54% (expansion) de nuestras filas estén completas y probablemente esta varible no sea de mucha infomación. Por tanto la podemos eliminar de nuestro dataframe, ahorita mismo!!
+
+```{r}
+plot_missing(board_games)
+```
+
+### Eliminamos la columna que tienes más missing values
+
+Eliminamos notes de nuestro dataframe:
+
+```{r}
+final_board_games <- drop_columns(board_games, c("compilation","expansion"))
+
+colnames(final_board_games)
+```
+
+
+```{r}
+final_board_games <- na.omit(final_board_games) 
+```
+
+### Ánalisis de Correlación
+
+Podemos ver la más alta correlación en estas variables:
+
+- min_playtime-max_playtime
+- min_playtime-min_age
+- min_playtime-playing_time
+- average_rating-min_age
+
+```{r}
+plot_correlation(na.omit(final_board_games), maxcat = 5L)
+```
+Ahora de una manera más detallada vamos a analizar las variables más correlacionadas entre si, este top de 10:
+
+```{r}
+corr_cross(final_board_games, # name of dataset
+  max_pvalue = 0.05, # display only significant correlations (at 5% level)
+  top = 10 # display top 10 couples of variables (by correlation coefficient)
+)
+```
+### QQ plot
+
+La gráfica Quantile-Quantile es una forma de visualizar la desvisión de una distribución de probabilidad específica.
+
+Después de analizar estos gráficos, a menudo es beneficioso aplicar una transformación matemática (como logaritmo) para modelos como la regresión lineal. Para hacerlo, podemos usar la función plot_qq. De forma predeterminada, se compara con la distribución normal.
+
+```{r}
+qq_data <- final_board_games[, c("min_playtime", "max_playtime", "min_age", "playing_time", "average_rating")]
+
+plot_qq(qq_data, sampled_rows = 1000L)
+
+```
+En el gráfico, las columnas parecen sesgadas en ambas colas. Apliquemos una transformación logarítmica simple y grafiquemos de nuevo. Average Rating no mejoró
+```{r}
+log_qq_data <- update_columns(qq_data, 1:5, function(x) log(x + 1))
+
+
+plot_qq(log_qq_data, sampled_rows = 1000L)
+
+```
+
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
