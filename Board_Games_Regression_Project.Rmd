@@ -45,22 +45,38 @@ que, en cambio, vienen de la página Board Game Geek.
 Procedemos para empezar en instalar los siguientes paquetes, se puede omitir este paso si ya se tienen previamente instalados. Aquí una lista de los cuales vamos a necesitar.
 
 ```{r}
-#install.packages("DataExplorer")
-#install.packages("lares")
+#install.packages("data.table")
+#install.packages("h2o")
 #install.packages("ggplot2")
 #install.packages("ggthemes")
+#install.packages("data.tree")
+#install.packages("tidyverse")
+#install.packages("modeldata")
+#install.packages("DataExplorer")
 #install.packages("vtree")
+#install.packages("caTools")
+#install.packages("rpart")
+#install.packages("rpart.plot")
+#install.packages("lares")
 ```
 ## Cargar Librerías
  
 Usando 'library' cargamos las librerías, con las cuales vas a hacer uso de las diferentes funciones. 
 
 ```{r}
-library("DataExplorer")
-library("lares")
+library("data.table")
+library("h2o")
 library("ggplot2")
 library("ggthemes")
+library("data.tree")
+library("tidyverse")
+library("modeldata")
+library("DataExplorer")
 library("vtree")
+library("caTools")
+library("rpart")
+library("rpart.plot")
+library("lares")
 ```
 
 ## Ánalisis Descriptivo, Data Engineering
@@ -246,7 +262,17 @@ Usamos vtree para observar la concentración de los datos por ejemplo para max_p
 vtree(final_board_games, "max_players")
 ```
 
+### Descartar los fabricantes que no aportan data
 
+Quitamos los fabricantes que no aportan data y nos quedamos con los que acumulan juntos el 85%, volvemos a gráficar, ahora si esto se ve más claro!!
+
+```{r}
+final_board_games <- final_board_games %>% filter(min_players %in% c('0','4','8'))
+
+final_board_games %>%  ggplot() +
+  geom_bar(mapping = aes(x = min_players)) +
+  ggtitle("Count of Board Games by min_players")
+```
 
 
 
