@@ -328,7 +328,7 @@ regtree <- rpart(formula=average_rating~.,
                  control = rpart.control(maxdepth =  3))
 
 # Visualización del árbol de decisión
-rpart.plot(regtree, box.palette = "RdBu", digits= -3)
+#rpart.plot(regtree, box.palette = "RdBu", digits= -3)
 ```
 
 ```{r}
