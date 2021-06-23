@@ -1,7 +1,7 @@
 ---
 title: "Board_Games_Regression_Project"
 author: 'Adrian Homero Moreno García- adrian.moreno@iteso.mx, Gabriel Alejandro Morales
-  Ruiz- '
+  Ruiz- ie693871@iteso.mx'
 date: "6/21/2021"
 output:
   html_document:
@@ -83,15 +83,13 @@ library("lares")
  
 ### Leemos nuestro dataset
 
-En este caso usamos read.csv, proceedemos a leer:
+En este caso usamos read.csv. Procedemos a leer:
 
 ```{r}
 board_games <- read.csv("./board_games.csv") 
 ```
 
 ### Observación de las primeras líneas
-
-Para ejemplificar usaremos el data frame `turbines`, y con la función `head()` solo mostraremos las pirmeras 6 líneas de este: 
 
 - game_id	Identificador único
 - description	Descripción corta
@@ -149,9 +147,9 @@ Para visualizar el perfil de los datos faltantes podemos utilizar la función pl
 plot_missing(board_games)
 ```
 
-### Eliminamos la columna que tienes más missing values
+### Eliminamos la columna que tiene más missing values
 
-Eliminamos notes de nuestro dataframe:
+Eliminamos compilation y expansion de nuestro dataframe:
 
 ```{r}
 final_board_games <- drop_columns(board_games, c("compilation","expansion"))
@@ -176,7 +174,7 @@ Podemos ver la más alta correlación en estas variables:
 ```{r}
 plot_correlation(na.omit(final_board_games), maxcat = 5L)
 ```
-Ahora de una manera más detallada vamos a analizar las variables más correlacionadas entre si, este top de 10:
+Ahora de una manera más detallada vamos a analizar las variables más correlacionadas entre sí. El top 10:
 
 ```{r}
 corr_cross(final_board_games, # name of dataset
@@ -196,7 +194,7 @@ qq_data <- final_board_games[, c("min_playtime", "max_playtime", "min_age", "pla
 plot_qq(qq_data, sampled_rows = 1000L)
 
 ```
-En el gráfico, las columnas parecen sesgadas en ambas colas. Apliquemos una transformación logarítmica simple y grafiquemos de nuevo. Average Rating no mejoró. Gabo si ves que es necesario podemos hacerle update a las columnas con la transformación.
+En el gráfico, las columnas parecen sesgadas en ambas colas. Apliquemos una transformación logarítmica simple y grafiquemos de nuevo. 
 ```{r}
 log_qq_data <- update_columns(qq_data, 1:5, function(x) log(x + 1))
 
@@ -209,7 +207,6 @@ plot_qq(log_qq_data, sampled_rows = 1000L)
 Teniendo nuestras variables con mayor correlación vamos a gráficarlas con geom point..:
 
 - min_playtime-max_playtime
-
 
 ```{r}
 final_board_games %>%  ggplot(aes(x = min_playtime, y = max_playtime)) + 
@@ -262,89 +259,27 @@ Usamos vtree para observar la concentración de los datos por ejemplo para max_p
 vtree(final_board_games, "max_players")
 ```
 
-### Descartar los fabricantes que no aportan data
-
-Quitamos los fabricantes que no aportan data, volvemos a gráficar, ahora si esto se ve más claro!!
-
-```{r}
-final_board_games <- final_board_games %>% filter(min_players %in% c('0','4','8'))
-
-final_board_games %>%  ggplot() +
-  geom_bar(mapping = aes(x = min_players)) +
-  ggtitle("Count of Board Games by min_players")
-```
-
-Quitamos los fabricantes que no aportan data, volvemos a gráficar, ahora si esto se ve más claro!!
-
-```{r}
-final_board_games <- final_board_games %>% filter(max_players %in% c('0','9','12','13','15','18','24','99'))
-
-final_board_games %>%  ggplot() +
-  geom_bar(mapping = aes(x = max_players)) +
-  ggtitle("Count of Board Games by max_players")
-```
 
 ### ¿Que se ha hecho hasta ahora?
 
-Se realizó una exploración de datos, donde primero eliminalos columnas que no tienen mucha significancia en la predicción de nuestra variable turbine rated capacity, después vimos su correlación entre las existentes, y seleccionamos esas tres para analizarlas, también quité notes una variable con muchos missing values, entonces entre otras cosas más se hicieron como por ejemplo: 
-
-- hub_height_m: Le aplicamos un log porque su data tiene ambas colas muy sesgadas, pero aún así no funcionó la transformación y quedó igual , así que no se modifició
-- rotor_diamater_m: Se revisó que tiene una correlación creciente , aunque tenía unos outliers con los fabricantes,
-- manufacturers: después de analizarlos con root_diamater, y con su capacity, observé que en realidad algunos datos se perdían entre la correlación por lo que hice fue primero hacer una limpieza a los fabricantes y solo dejé los 4 que daban más significado al data con casi un 85%
+Se realizó una exploración de datos, donde primero eliminalos columnas que no tienen mucha significancia en la predicción de nuestra variable de calificación. Después vimos su correlación entre las existentes.
 
 Se tiene más claro cuales son las variables más significativas a la predicción, se hizo una limpieza, tenemos datos más contundentes con los cuales comenzar nuestra predicción, menos outliers sobre todo.
 
 
+## Propuestas
 
+Debido a que el problema intenta convencer a José de que sus juegos pudieron haber sido (en promedio) bien recibidos, y de cómo se espera que se reciban en un futuro, la variable de salida de nuestro problema es la calificación de los usuarios del sitio web. Esto puede hacerse de dos maneras: una regresión y tomar la calificación como una variable continua, o redondear y tomarlo como problema de clasificación (calificación discreta de 0 a 10). Las propuestas para estos casos son
 
-## rpart library for decision tree
- 
-### Leemos nuestro dataset
+### Regresión
+- Support Vector Regression
+- Random Forest
+- Regresión lineal múltiple
 
-```{r}
-set.seed(0)  # La semilla
-final_board_games_n <- final_board_games[c(4,5,6,7,8,10,19,20)]
-final_board_games_rpart <- as.data.frame(final_board_games_n)
-split = sample.split(final_board_games_rpart,SplitRatio=0.8) # Los datos de train serán de 80%
-train_rpart = subset(final_board_games_rpart,split == TRUE)
-test_rpart = subset(final_board_games_rpart,split == FALSE)
-```
+### Clasificación
+- Support Vector Machine
+- Random Forest
+- Multilayer perceptron
 
-
-```{r}
-summary(train_rpart)
-summary(test_rpart)
-```
-
-### Leemos nuestro dataset
-
-En este caso usamos fread, de data table, proceedemos a leer:
-
-```{r}
-# Modelo de regresión con el conjunto de datos train
-# Modelo de regresión con el conjunto de datos train
-regtree <- rpart(formula=average_rating~., 
-                 data = train_rpart, 
-                 control = rpart.control(maxdepth =  3))
-
-# Visualización del árbol de decisión
-#rpart.plot(regtree, box.palette = "RdBu", digits= -3)
-```
-
-```{r}
-# Cálculo del predictor
-test_rpart <- test_rpart %>%  mutate(pred =predict(regtree, test_rpart, type = "vector"),
-                         reg = 1:nrow(test_rpart),
-                         dif_pred_coll = hub_height_m-pred)
-
-ggplot(test_rpart)+
-  geom_point(aes(x=reg, y=dif_pred_coll))
-
-#[1] 23529.06
-MSE2 <- mean((test_rpart$pred - test_rpart$total_project_capacity_mw)^2)
-```
-
-
-
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Vamos a suponer que a la comunidad de juegos de mesa no les importa tanto el historial del autor del juego ni quién lo publique, por lo que esas columnas se eliminarían del análisis.
+Si José ve que sus juegos no hubieran gustado, al menos podrá tener un modelo con el cuál puede saber qué es lo que suele gustarle a la gente, por lo que podría hacer investigación de seguimiento para entablar las causas raíces.
