@@ -152,8 +152,8 @@ plot_missing(board_games)
 Eliminamos compilation y expansion de nuestro dataframe:
 
 ```{r}
-final_board_games <- drop_columns(board_games, c("compilation","expansion"))
-
+final_board_games <- drop_columns(board_games, c("description", "image", "name", "thumbnail", "game_id", "compilation","expansion", "family", "artist", "mechanic"))
+final_board_games <- drop_columns(final_board_games, c("designer", "publisher"))
 colnames(final_board_games)
 ```
 
@@ -204,12 +204,12 @@ plot_qq(log_qq_data, sampled_rows = 1000L)
 ```
 
 ### Ánalisis Exploratorio de los Datos
-Teniendo nuestras variables con mayor correlación vamos a gráficarlas con geom point..:
+Teniendo nuestras variables con mayor correlación vamos a graficarlas con geom point..:
 
-- min_playtime-max_playtime
+- min_playtime-min_age
 
 ```{r}
-final_board_games %>%  ggplot(aes(x = min_playtime, y = max_playtime)) + 
+final_board_games %>%  ggplot(aes(x = min_playtime, y = min_age)) + 
   geom_point()
 ```
 
@@ -283,3 +283,119 @@ Debido a que el problema intenta convencer a José de que sus juegos pudieron ha
 
 Vamos a suponer que a la comunidad de juegos de mesa no les importa tanto el historial del autor del juego ni quién lo publique, por lo que esas columnas se eliminarían del análisis.
 Si José ve que sus juegos no hubieran gustado, al menos podrá tener un modelo con el cuál puede saber qué es lo que suele gustarle a la gente, por lo que podría hacer investigación de seguimiento para entablar las causas raíces.
+
+# Modelado
+
+Primero hacemos la separación de los datos en train y test. Todos los modelos usarán los mismos subconjuntos para poder evaluarlos y compararlos en un terreno nivelado.
+
+```{r}
+library(caTools)
+set.seed(0)
+split = sample.split(final_board_games, SplitRatio=0.6)
+data.train = subset(final_board_games, split=TRUE)
+data.test = subset(final_board_games, split=FALSE)
+```
+
+
+## Regresión
+
+### Support Vector Regression
+
+```{r}
+library(caret)
+library(doParallel)
+set.seed(0)
+control = trainControl(method="repeatedcv", repeats=5, search="random")
+registerDoParallel(cores = parallel::detectCores() - 1)
+model.svr = train(average_rating ~ ., data = drop_columns(data.train, "category"),
+               method = "svmRadial",
+               tuneLength = 15,
+               metric = "RMSE",
+               preProc = c("center", "scale"),
+               trControl = control)
+model.svr
+
+```
+
+```{r}
+plot_qq(predict(model.svr, newdata=data.test) - data.test$average_rating)
+```
+
+
+### Random Forest
+
+```{r}
+library(h2o)
+h2o.init()
+
+data.h2o.train = as.h2o(data.train)
+data.h2o.test = as.h2o(data.test)
+
+
+model.h2o.rf = h2o.randomForest(
+  training_frame = data.h2o.train,
+  validation_frame = data.h2o.test,
+  x = c(1, 2, 3, 4, 5, 6, 7, 8, 10),
+  y = 9,
+  model_id = "rf_covType_v1",
+  ntrees = 200,
+  stopping_rounds = 2,
+  score_each_iteration = T,
+  seed = 26
+)
+
+summary(model.h2o.rf)
+```
+
+
+## Clasificación
+
+```{r}
+library(tidymodels)
+
+data.train.discrete = data.train %>% mutate(discrete_rating = round(average_rating)) %>% drop_columns("average_rating")
+data.test.discrete = data.test %>% mutate(discrete_rating = round(average_rating)) %>% drop_columns("average_rating")
+
+rf = rand_forest(
+  mode = "classification",
+  trees = tune(),
+  min_n = tune()
+) %>% set_engine(engine = "randomForest")
+
+transformer = recipe(
+  formula = discrete_rating ~ .,
+  data = data.train.discrete
+)
+
+cv_folds = vfold_cv(
+  data = data.train.discrete,
+  v = 5,
+  strata = discrete_rating
+)
+
+workflow_modelado = workflow() %>%
+  add_recipe(transformer) %>%
+  add_model(rf)
+
+hp_grid = grid_regular(
+  trees(range = c(50L, 3000L), trans = NULL),
+  min_n(range = c(2L, 100L), trans = NULL),
+  levels = 5
+)
+
+registerDoParallel(cores = parallel::detectCores() - 1)
+
+grid_fit = tune_bayes(
+  workflow_modelado,
+  resamples = cv_folds,
+  initial = 20,
+  iter = 30,
+  control = control_bayes(no_improve = 20, verbose = FALSE)
+)
+```
+
+
+### Support Vector Machine
+
+### Random Forest
+
