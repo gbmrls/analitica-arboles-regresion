@@ -58,6 +58,11 @@ Procedemos para empezar en instalar los siguientes paquetes, se puede omitir est
 #install.packages("rpart")
 #install.packages("rpart.plot")
 #install.packages("lares")
+#install.packages("tidymodels")
+#install.packages("h2o")
+#install.packages("caret")
+#install.packages("doParallel")
+#install.packages("caTools")
 ```
 ## Cargar Librerías
  
@@ -77,6 +82,11 @@ library("caTools")
 library("rpart")
 library("rpart.plot")
 library("lares")
+library("tidymodels")
+library("h2o")
+library("caret")
+library("doParallel")
+library("caTools")
 ```
 
 ## Ánalisis Descriptivo, Data Engineering
@@ -321,13 +331,47 @@ model.svr
 plot_qq(predict(model.svr, newdata=data.test) - data.test$average_rating)
 ```
 
+## H2O Models, Comparision, Predictions
 
-### Random Forest
+### Inicializar H2O
+Creamos el clusgter local con todos los cores disponibles de la siguiente forma:
+Se eliminan los datos del cluster por si ya había sido inicializado.
+Tras iniciar el cluster (local), se muestran por pantalla sus características, entre las que están: el número de cores activados (4), la memoria total del cluster (5.32 GB), el número de nodos (1 porque se está empleando un único computador) y el puerto con el que conectarse a la interfaz web de H2O (http://localhost:54321/flow/index.html).
+```{r}
+# inicialización de h2o
+h2o.init(
+  ip = "localhost",
+  # -1 indica que se empleen todos los cores disponibles.
+  nthreads = -1,
+  # Máxima memoria disponible para el cluster.
+  max_mem_size = "6g"
+)
+
+h2o.removeAll()
+h2o.no_progress()
+```
+
+### Carga de datos -Separación de training, validación y test
+La carga de datos puede hacerse directamente al cluster H2O, o bien cargándolos primero en memoria en la sesión de R y después transfiriéndolos. La segunda opción no es aconsejable si el volumen de datos es muy grande.
+
+Para nuestro caso el conjunto de datos de turbines es suficientemente pequeño y lo podemos almacenar en memoria, por tanto lo podemos llamar con la siguiente función.
+
+Antes de hacer la separación tengamos claro la diferencia entre estas particiones del conjunto de datos:
+
+Datos de train: la muestra de los datos utilizada para ajustar el modelo.
+
+Datos de validación: la muestra de datos que se utiliza para proporcionar una evaluación imparcial de un ajuste de modelo en el conjunto de datos de train mientras se ajustan los hiperparámetros del modelo. La evaluación se vuelve más sesgada a medida que la habilidad del conjunto de datos de validación se incorpora a la configuración del modelo.
+
+Datos de test: la muestra de datos utilizada para proporcionar una evaluación imparcial de un ajuste final del modelo en el conjunto de datos de entrenamiento.
+
+La función h2o.splitFrame() realiza particiones aleatorias, pero no permite hacerlas de forma estratificada, por lo que no asegura que la distribución de clases de variable respuesta sea igual en todas particiones. Esto puede ser problemático con datos muy desbalanceados (alguno de los grupos es muy minoritario).
+
+
+En el momento en que consideremos la validación, debemos agregar en los ratios el porcentaje de la validación, en este caso será train (60%), validación (20%) y test (20%). En la semilla se le agrega el el numeral 4 y se adiciona un nuevo subconjunto de datos, entendiendo que el 1 es train, el 2 es validación y el 3 es test.
+
+
 
 ```{r}
-library(h2o)
-h2o.init()
-
 datos_h2o <- as.h2o(x = final_board_games, destination_frame = "datos_h2o")
 
 particiones     <- h2o.splitFrame(data = datos_h2o, ratios = c(0.6,0.2), seed = 1234)
@@ -338,7 +382,13 @@ datos_test_h2o  <- h2o.assign(data = particiones[[3]], key = "datos_test_H2O")
 data.h2o.train = as.h2o(data.train)
 data.h2o.test = as.h2o(data.test)
 
+```
 
+### Random Forest
+
+La función para este modelo en h2o es h2o.randomForest. Dentro de ella debemos de especificar los datos de train que convertimos dentro de h2o y, si así lo queremos los datos de validación. Para cuando no queremos utilizar datos de validación esta línea se omite dentro del modelo cambia la partición del conjunto de datos. Se descartan las columnas categóricas , usamos solo las númericas para este random forest, también quitamos el object_id, solo nos interesa el rango x = c(1, 2, 3, 4, 5, 6, 7, 8, 10), y sy predicción que es la y = 9.
+
+```{r}
 model.h2o.rf = h2o.randomForest(
   training_frame = datos_train_h2o,
   validation_frame = datos_test_h2o,
@@ -355,6 +405,10 @@ summary(model.h2o.rf)
 ```
 
 ### Gradient Boosting Machines (GBM)
+Primero haremos todas la configuraciones predeterminadas y luego comenzaremos a hacer algunos cambios donde se describen los parámetros y los valores predeterminados.
+
+Podemos observar una estructura muy similar a la del random forest, ahora utilizaremos la función h2o.gbm.. NOTA: En la mayoría de los algorimos el primero es para regresión y el segundo para clasificación.
+
 ```{r}
 gbm_model <- h2o.gbm(
   training_frame = datos_train_h2o, # datos de h2o para training
@@ -368,11 +422,39 @@ gbm_model <- h2o.gbm(
 summary(gbm_model)
 ```
 
+### Scoring del modelo (GBM)
+Podemos ver la evolución del modelo, para evaluar cómo aprende el modelo a medida que se añaden nuevos árboles al ensamble.
+
+h2o almacena las métricas de entrenamiento y test bajo el nombre de scoring. Los valores se encuentran almacenados dentro del modelo.
+```{r}
+scoring <- as.data.frame(gbm_model@model$scoring_history)
+head(scoring)
+```
+### Importancia Varibaes del modelo (GBM)
+
+En los modelos GBM, se puede estudiar la influencia de los predictores cuantificando la reducción total de error cuadrático que ha conseguido cada predictor en el conjunto de todos los árboles que forman el modelo.
+```{r}
+importancia <- as.data.frame(gbm_model@model$variable_importances)
+importancia
+```
+
+### ggplot variables importancia del modelo (GBM)
+```{r}
+ggplot(data = importancia,
+       aes(x = reorder(variable, scaled_importance), y = scaled_importance)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Importancia de los predictores en el modelo GBM",
+       subtitle = "Importancia en base a la reducción del error cuadrático medio",
+       x = "Predictor",
+       y = "Importancia relativa") +
+  theme_bw()
+```
+
 
 ## Clasificación
 
 ```{r}
-library(tidymodels)
 
 data.train.discrete = data.train %>% mutate(discrete_rating = round(average_rating)) %>% drop_columns("average_rating")
 data.test.discrete = data.test %>% mutate(discrete_rating = round(average_rating)) %>% drop_columns("average_rating")
