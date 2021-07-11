@@ -328,13 +328,20 @@ plot_qq(predict(model.svr, newdata=data.test) - data.test$average_rating)
 library(h2o)
 h2o.init()
 
+datos_h2o <- as.h2o(x = final_board_games, destination_frame = "datos_h2o")
+
+particiones     <- h2o.splitFrame(data = datos_h2o, ratios = c(0.6,0.2), seed = 1234)
+datos_train_h2o <- h2o.assign(data = particiones[[1]], key = "datos_train_H2O")
+datos_valid_h2o <- h2o.assign(data = particiones[[2]], key = "datos_valid_H2O")
+datos_test_h2o  <- h2o.assign(data = particiones[[3]], key = "datos_test_H2O")
+
 data.h2o.train = as.h2o(data.train)
 data.h2o.test = as.h2o(data.test)
 
 
 model.h2o.rf = h2o.randomForest(
-  training_frame = data.h2o.train,
-  validation_frame = data.h2o.test,
+  training_frame = datos_train_h2o,
+  validation_frame = datos_test_h2o,
   x = c(1, 2, 3, 4, 5, 6, 7, 8, 10),
   y = 9,
   model_id = "rf_covType_v1",
@@ -345,6 +352,20 @@ model.h2o.rf = h2o.randomForest(
 )
 
 summary(model.h2o.rf)
+```
+
+### Gradient Boosting Machines (GBM)
+```{r}
+gbm_model <- h2o.gbm(
+  training_frame = datos_train_h2o, # datos de h2o para training
+  validation_frame = datos_valid_h2o, # datos de h2o para validación (no es requerido)
+  x = c(1, 2, 3, 4, 5, 6, 7, 8, 10),, # Las columnas predictoras, por índice
+ y = 9,    # La columna que queremos predecir, variable objetivo
+  model_id = "gbm_covType1", # nombre del modelo en h2o
+  seed = 2000000   # Establecer una semilla aleatoria para que se pueda reproducir
+) 
+
+summary(gbm_model)
 ```
 
 
