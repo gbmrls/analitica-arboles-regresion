@@ -486,6 +486,27 @@ predicciones <- h2o.predict(
 head(predicciones)
 ```
 
+```{r}
+# Predictores para el modelo de GBM
+predicciones_2 <- h2o.predict(
+  object = gbm_model,
+  newdata = datos_test_h2o
+)
+head(predicciones_2)
+```
+Para encontrar el error (RMSE), para comparar con los modelos que hemos estudiado, podemos encontrar el valor para el modelo que hicimos para random forest.
+
+```{r}
+h2o.performance(model = model.h2o.rf, newdata = datos_test_h2o)@metrics$RMSE
+```
+
+```{r}
+h2o.performance(model = gbm_model, newdata = datos_test_h2o)@metrics$RMSE
+```
+
+```{r}
+h2o.performance(model = gbm_model_2, newdata = datos_test_h2o)@metrics$RMSE
+```
 
 ## Clasificación
 
@@ -536,4 +557,13 @@ grid_fit = tune_bayes(
 ### Support Vector Machine
 
 ### Random Forest
+
+# Referencias
+
+* http://docs.h2o.ai/h2o-tutorials/latest-stable/index.html
+
+* https://docs.h2o.ai/h2o/latest-stable/h2o-r/docs/reference/h2o.randomForest.html
+
+* Joaquín Amat Rodrigo, Machine Learning con H2O y R. Abril 2020. https://rpubs.com/Joaquin_AR/406480
+
 
