@@ -451,6 +451,41 @@ ggplot(data = importancia,
   theme_bw()
 ```
 
+### Modelo GBM cambiando parámetros
+
+En los modelos GBM, se puede estudiar la influencia de los predictores cuantificando la reducción total de error cuadrático que ha conseguido cada predictor en el conjunto de todos los árboles que forman el modelo.
+```{r}
+gbm_model_2 <- h2o.gbm(
+  training_frame = datos_train_h2o, # datos de h2o para training
+  validation_frame = datos_valid_h2o, # datos de h2o para validación (no es requerido)
+  x = c(2:3,5:11), # Las columnas predictoras, por índice
+  y = 4,    # La columna que queremos predecir, variable objetivo
+  model_id = "gbm_covType1", # nombre del modelo en h2o
+  ntrees = 200, 
+  max_depth = 30,
+  stopping_rounds = 2,
+  stopping_tolerance = 1e-2,
+  seed = 2000000   # Establecer una semilla aleatoria para que se pueda reproducir
+) 
+```
+
+### Calculamos las métricas
+```{r}
+gbm_model_2@model$validation_metrics
+```
+
+### Predicciones y error
+Una vez hemos ajustado el modelo, se puede predecir nuevas observaciones y estimar el error de test.
+
+```{r}
+# Predictores para el modelo de random forest
+predicciones <- h2o.predict(
+  object = random_forest_model,
+  newdata = datos_test_h2o
+)
+head(predicciones)
+```
+
 
 ## Clasificación
 
