@@ -32,7 +32,7 @@ knitr::opts_chunk$set(echo= TRUE,
 
 </center>
 
-## Introducción
+# Introducción
 
 José es un diseñador de juegos de mesa. Crea las reglas, diseña los gráficos, escoge su tema, número de jugadores y duración promedio del juego que tiene en mente. José es una persona tímida, y a pesar de que sus juegos suelen gustarle a sus amigos, él nunca ha querido publicarlos por miedo a que no sean bien recibidos. Se quiere demostrar a José, con una base de datos de calificaciones históricas de juegos de mesa, cómo hubieran sido recibidos sus juegos en promedio en la época que los fue creando.
 
@@ -307,9 +307,8 @@ data.test = subset(final_board_games, split=FALSE)
 ```
 
 
-## Regresión
 
-### Support Vector Regression
+## Support Vector Regression
 
 ```{r}
 library(caret)
@@ -331,7 +330,7 @@ model.svr
 plot_qq(predict(model.svr, newdata=data.test) - data.test$average_rating)
 ```
 
-## H2O Models, Comparision, Predictions
+## H2O Models
 
 ### Inicializar H2O
 Creamos el clusgter local con todos los cores disponibles de la siguiente forma:
@@ -374,14 +373,8 @@ En el momento en que consideremos la validación, debemos agregar en los ratios 
 ```{r}
 datos_h2o <- as.h2o(x = final_board_games, destination_frame = "datos_h2o")
 
-particiones     <- h2o.splitFrame(data = datos_h2o, ratios = c(0.6,0.2), seed = 1234)
-datos_train_h2o <- h2o.assign(data = particiones[[1]], key = "datos_train_H2O")
-datos_valid_h2o <- h2o.assign(data = particiones[[2]], key = "datos_valid_H2O")
-datos_test_h2o  <- h2o.assign(data = particiones[[3]], key = "datos_test_H2O")
-
-data.h2o.train = as.h2o(data.train)
-data.h2o.test = as.h2o(data.test)
-
+datos_train_h2o <- as.h2o(x = data.train, key = "datos_train_h2o")
+datos_valid_h2o <- as.h2o(x = data.test, key = "datos_valid_h2O")
 ```
 
 ### Random Forest
@@ -391,7 +384,7 @@ La función para este modelo en h2o es h2o.randomForest. Dentro de ella debemos 
 ```{r}
 model.h2o.rf = h2o.randomForest(
   training_frame = datos_train_h2o,
-  validation_frame = datos_test_h2o,
+  validation_frame = datos_valid_h2o,
   x = c(1, 2, 3, 4, 5, 6, 7, 8, 10),
   y = 9,
   model_id = "rf_covType_v1",
@@ -414,7 +407,7 @@ gbm_model <- h2o.gbm(
   training_frame = datos_train_h2o, # datos de h2o para training
   validation_frame = datos_valid_h2o, # datos de h2o para validación (no es requerido)
   x = c(1, 2, 3, 4, 5, 6, 7, 8, 10),, # Las columnas predictoras, por índice
- y = 9,    # La columna que queremos predecir, variable objetivo
+  y = 9,    # La columna que queremos predecir, variable objetivo
   model_id = "gbm_covType1", # nombre del modelo en h2o
   seed = 2000000   # Establecer una semilla aleatoria para que se pueda reproducir
 ) 
@@ -422,7 +415,7 @@ gbm_model <- h2o.gbm(
 summary(gbm_model)
 ```
 
-### Scoring del modelo (GBM)
+#### Scoring del modelo
 Podemos ver la evolución del modelo, para evaluar cómo aprende el modelo a medida que se añaden nuevos árboles al ensamble.
 
 h2o almacena las métricas de entrenamiento y test bajo el nombre de scoring. Los valores se encuentran almacenados dentro del modelo.
@@ -430,7 +423,7 @@ h2o almacena las métricas de entrenamiento y test bajo el nombre de scoring. Lo
 scoring <- as.data.frame(gbm_model@model$scoring_history)
 head(scoring)
 ```
-### Importancia Varibaes del modelo (GBM)
+#### Importancia Variables del modelo
 
 En los modelos GBM, se puede estudiar la influencia de los predictores cuantificando la reducción total de error cuadrático que ha conseguido cada predictor en el conjunto de todos los árboles que forman el modelo.
 ```{r}
@@ -438,7 +431,7 @@ importancia <- as.data.frame(gbm_model@model$variable_importances)
 importancia
 ```
 
-### ggplot variables importancia del modelo (GBM)
+#### ggplot variables importancia del modelo
 ```{r}
 ggplot(data = importancia,
        aes(x = reorder(variable, scaled_importance), y = scaled_importance)) +
@@ -451,7 +444,7 @@ ggplot(data = importancia,
   theme_bw()
 ```
 
-### Modelo GBM cambiando parámetros
+### Modelo GBM alternativo
 
 En los modelos GBM, se puede estudiar la influencia de los predictores cuantificando la reducción total de error cuadrático que ha conseguido cada predictor en el conjunto de todos los árboles que forman el modelo.
 ```{r}
@@ -469,19 +462,19 @@ gbm_model_2 <- h2o.gbm(
 ) 
 ```
 
-### Calculamos las métricas
+#### Métricas
 ```{r}
 gbm_model_2@model$validation_metrics
 ```
 
-### Predicciones y error
+#### Predicciones y error
 Una vez hemos ajustado el modelo, se puede predecir nuevas observaciones y estimar el error de test.
 
 ```{r}
 # Predictores para el modelo de random forest
 predicciones <- h2o.predict(
-  object = random_forest_model,
-  newdata = datos_test_h2o
+  object = model.h2o.rf,
+  newdata = datos_valid_h2o
 )
 head(predicciones)
 ```
@@ -490,75 +483,54 @@ head(predicciones)
 # Predictores para el modelo de GBM
 predicciones_2 <- h2o.predict(
   object = gbm_model,
-  newdata = datos_test_h2o
+  newdata = datos_valid_h2o
 )
 head(predicciones_2)
 ```
-Para encontrar el error (RMSE), para comparar con los modelos que hemos estudiado, podemos encontrar el valor para el modelo que hicimos para random forest.
+
+
+# Comparasión
+
+En total se tuvieron 4 modelos: Support Vector Regression, Random Forest, Gradient Boosting Machine y un GBM alternativo. Revisemos sus errores de entrenamiento y de prueba.
 
 ```{r}
-h2o.performance(model = model.h2o.rf, newdata = datos_test_h2o)@metrics$RMSE
+svr.rmse.train = min(model.svr$results$RMSE)
+svr.rmse.test = ModelMetrics::rmse(predict(model.svr, newdata=data.test), data.test$average_rating)
+
+rf.rmse.train = tail(model.h2o.rf@model$scoring_history$training_rmse, 1)
+rf.rmse.test = tail(model.h2o.rf@model$scoring_history$validation_rmse, 1)
+
+gbm1.rmse.train = tail(gbm_model@model$scoring_history$training_rmse, 1)
+gbm1.rmse.test = tail(gbm_model@model$scoring_history$validation_rmse, 1)
+
+gbm2.rmse.train = tail(gbm_model_2@model$scoring_history$training_rmse, 1)
+gbm2.rmse.test = tail(gbm_model_2@model$scoring_history$validation_rmse, 1)
 ```
+
+De izquierda a derecha: RMSE de entrenamiento de SVR, RF, GBM1 y GBM2
 
 ```{r}
-h2o.performance(model = gbm_model, newdata = datos_test_h2o)@metrics$RMSE
+barplot(c(svr.rmse.train, rf.rmse.train, gbm1.rmse.train, gbm2.rmse.train))
 ```
+
+De izquierda a derecha: RMSE de validación de SVR, RF, GBM1 y GBM2
 
 ```{r}
-h2o.performance(model = gbm_model_2, newdata = datos_test_h2o)@metrics$RMSE
+barplot(c(svr.rmse.test, rf.rmse.test, gbm1.rmse.test, gbm2.rmse.test))
 ```
 
-## Clasificación
+Recordemos que todos los modelos usan el mismo subconjunto de entrenamiento y de validación, y todos presentan una retroalimentación para la optimización de hiperparámetros.
+Parece que el mejor modelo es el GBM2, pues tiene un error de entrenamiento y de validación mucho más bajos que los otros.
 
-```{r}
+# Conclusiones
 
-data.train.discrete = data.train %>% mutate(discrete_rating = round(average_rating)) %>% drop_columns("average_rating")
-data.test.discrete = data.test %>% mutate(discrete_rating = round(average_rating)) %>% drop_columns("average_rating")
+La exploración de datos es una fase muy importante en el ciclo de vida de un proyecto de ciencia de datos. El entender la distribución de las variables te da una idea mucho más clara de qué es lo que podrías usar para predecir la salida que se necesita; aunque el entendimiento del negocio es una fase que puede tomar un tiempo más largo (nosotros tuvimos la suerte de que ya entendíamos cómo funcionaba el sitio web en el que se basa el conjunto de datos que usamos).
 
-rf = rand_forest(
-  mode = "classification",
-  trees = tune(),
-  min_n = tune()
-) %>% set_engine(engine = "randomForest")
-
-transformer = recipe(
-  formula = discrete_rating ~ .,
-  data = data.train.discrete
-)
-
-cv_folds = vfold_cv(
-  data = data.train.discrete,
-  v = 5,
-  strata = discrete_rating
-)
-
-workflow_modelado = workflow() %>%
-  add_recipe(transformer) %>%
-  add_model(rf)
-
-hp_grid = grid_regular(
-  trees(range = c(50L, 3000L), trans = NULL),
-  min_n(range = c(2L, 100L), trans = NULL),
-  levels = 5
-)
-
-registerDoParallel(cores = parallel::detectCores() - 1)
-
-grid_fit = tune_bayes(
-  workflow_modelado,
-  resamples = cv_folds,
-  initial = 20,
-  iter = 30,
-  control = control_bayes(no_improve = 20, verbose = FALSE)
-)
-```
-
-
-### Support Vector Machine
-
-### Random Forest
+Las mil y una formas de implementar un modelo predictivo también se convierten en una barrera para seguir el proyecto: ¿cuál de todas las opciones es la mejor para el problema que se tiene? ¿Cómo justificas usar un Random Forest contra una red neuronal? (Seguramente con práctica y pericia).
 
 # Referencias
+
+* Johan A K Suykens, Tony Van Gestel, Jos De Brabanter, BartDe Moor, and Joos Vandewalle.Least Squares Support VectorMachines. World Scientific,2002. ISBN9789812381514. URLhttps://www.worldscientific.com/worldscibooks/10.1142/5089.
 
 * http://docs.h2o.ai/h2o-tutorials/latest-stable/index.html
 
